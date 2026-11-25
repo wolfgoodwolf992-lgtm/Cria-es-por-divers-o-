@@ -1,0 +1,467 @@
+<?xml version='1.0' encoding='utf-8'?>
+<roblox version="4">
+  <Item class="DataModel" referent="RBX0">
+    <Properties>
+      <string name="Name">Fuja do W00byd0lx</string>
+    </Properties>
+    <Item class="Workspace" referent="RBX5">
+      <Properties>
+        <string name="Name">Workspace</string>
+      </Properties>
+    </Item>
+    <Item class="ServerScriptService" referent="RBX0">
+      <Properties />
+      <Item class="Script" referent="RBX1">
+        <Properties>
+          <string name="Name">W00byCorridor_Server</string>
+          <ProtectedString name="Source">-- FUJA DO W00BYD0LX | Script principal do servidor
+-- O mapa inteiro e criado automaticamente ao iniciar a experiencia.
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+
+local CONFIG = {
+    CorridorLength = 4500,
+    CorridorWidth = 100,
+    CorridorHeight = 80,
+    StartSpeed = 16,
+    MaxSpeed = 50,
+    RampSeconds = 7,
+    TriggerX = 900,          -- aproximadamente 56 segundos caminhando a 16 studs/s
+    PortalX = 932,           -- cerca de 2 segundos antes do portal
+    HeadSpeedBonus = 15,
+    HeadCatchDistance = 15,
+    ChaseDelay = 15,
+    AudioId = "rbxassetid://1837560230",
+}
+
+local old = Workspace:FindFirstChild("W00byCorridor")
+if old then old:Destroy() end
+
+local folder = Instance.new("Folder")
+folder.Name = "W00byCorridor"
+folder.Parent = Workspace
+
+local remote = ReplicatedStorage:FindFirstChild("W00byCorridorEvent")
+if not remote then
+    remote = Instance.new("RemoteEvent")
+    remote.Name = "W00byCorridorEvent"
+    remote.Parent = ReplicatedStorage
+end
+
+local function part(name, size, cf, color, material, parent, transparency)
+    local p = Instance.new("Part")
+    p.Name = name
+    p.Size = size
+    p.CFrame = cf
+    p.Anchored = true
+    p.CanCollide = true
+    p.Material = material or Enum.Material.Concrete
+    p.Color = color or Color3.fromRGB(35, 35, 43)
+    p.TopSurface = Enum.SurfaceType.Smooth
+    p.BottomSurface = Enum.SurfaceType.Smooth
+    p.Transparency = transparency or 0
+    p.Parent = parent or folder
+    return p
+end
+
+-- Corredor completamente fechado, reto e sem aberturas laterais.
+part("Piso", Vector3.new(CONFIG.CorridorLength, 4, CONFIG.CorridorWidth),
+    CFrame.new(CONFIG.CorridorLength/2, -2, 0), Color3.fromRGB(27,27,34), Enum.Material.Slate)
+part("Teto", Vector3.new(CONFIG.CorridorLength, 4, CONFIG.CorridorWidth),
+    CFrame.new(CONFIG.CorridorLength/2, CONFIG.CorridorHeight+2, 0), Color3.fromRGB(18,18,24), Enum.Material.Metal)
+part("Parede esquerda", Vector3.new(CONFIG.CorridorLength, CONFIG.CorridorHeight, 4),
+    CFrame.new(CONFIG.CorridorLength/2, CONFIG.CorridorHeight/2, -CONFIG.CorridorWidth/2), Color3.fromRGB(31,31,40), Enum.Material.Metal)
+part("Parede direita", Vector3.new(CONFIG.CorridorLength, CONFIG.CorridorHeight, 4),
+    CFrame.new(CONFIG.CorridorLength/2, CONFIG.CorridorHeight/2, CONFIG.CorridorWidth/2), Color3.fromRGB(31,31,40), Enum.Material.Metal)
+
+-- Faixas de luz no teto ao longo do percurso.
+for x = 40, CONFIG.CorridorLength - 40, 100 do
+    local lamp = part("Luz do corredor", Vector3.new(26, 1, 8),
+        CFrame.new(x, CONFIG.CorridorHeight-1, 0), Color3.fromRGB(255, 225, 190), Enum.Material.Neon, folder)
+    lamp.CanCollide = false
+    local light = Instance.new("PointLight")
+    light.Brightness = 1.2
+    light.Range = 48
+    light.Color = Color3.fromRGB(255, 220, 180)
+    light.Parent = lamp
+end
+
+-- Spawn inicial.
+local spawn = Instance.new("SpawnLocation")
+spawn.Name = "Checkpoint normal - Comeco"
+spawn.Size = Vector3.new(14, 1, 14)
+spawn.CFrame = CFrame.new(18, 1, 0)
+spawn.Anchored = true
+spawn.Neutral = true
+spawn.Duration = 0
+spawn.Material = Enum.Material.Neon
+spawn.Color = Color3.fromRGB(60, 190, 120)
+spawn.Parent = folder
+
+-- Portal decorativo no fim da primeira parte.
+local portalFrame = part("Portal - moldura", Vector3.new(8, 54, 54),
+    CFrame.new(CONFIG.PortalX, 27, 0), Color3.fromRGB(115, 35, 180), Enum.Material.Neon)
+portalFrame.CanCollide = false
+portalFrame.Transparency = 0.2
+local portalCore = part("Portal - energia", Vector3.new(2, 46, 46),
+    CFrame.new(CONFIG.PortalX-4, 27, 0), Color3.fromRGB(30, 0, 60), Enum.Material.ForceField)
+portalCore.CanCollide = false
+portalCore.Transparency = 0.35
+
+-- Zona invisível que interrompe o jogador aproximadamente 2 segundos antes do portal.
+local trigger = part("Gatilho da cena", Vector3.new(8, 30, 90),
+    CFrame.new(CONFIG.TriggerX, 15, 0), Color3.new(1,1,1), Enum.Material.SmoothPlastic)
+trigger.Transparency = 1
+trigger.CanCollide = false
+trigger.CanTouch = true
+
+-- Sala de vitória fisicamente separada, ligada ao fim do corredor.
+local winRoom = Instance.new("Model")
+winRoom.Name = "Sala de vitoria"
+winRoom.Parent = folder
+part("Piso da vitoria", Vector3.new(120, 4, 120), CFrame.new(CONFIG.CorridorLength+60, -2, 0),
+    Color3.fromRGB(35, 95, 65), Enum.Material.Grass, winRoom)
+part("Parede de fundo da vitoria", Vector3.new(4, 40, 120),
+    CFrame.new(CONFIG.CorridorLength+122, 18, 0), Color3.fromRGB(20, 65, 45), Enum.Material.Concrete, winRoom)
+local sign = part("Placa fisica - Voce ganhou", Vector3.new(42, 16, 2),
+    CFrame.new(CONFIG.CorridorLength+60, 15, -42), Color3.fromRGB(20, 115, 65), Enum.Material.Wood, winRoom)
+local surface = Instance.new("SurfaceGui")
+surface.Face = Enum.NormalId.Front
+surface.AlwaysOnTop = true
+surface.Parent = sign
+local label = Instance.new("TextLabel")
+label.Size = UDim2.fromScale(1,1)
+label.BackgroundTransparency = 1
+label.Text = "VOCE GANHOU!"
+label.TextColor3 = Color3.fromRGB(255,255,255)
+label.TextScaled = true
+label.Font = Enum.Font.GothamBlack
+label.Parent = surface
+
+-- Limites fechados no final do corredor e na entrada.
+part("Parede de inicio", Vector3.new(4, CONFIG.CorridorHeight, CONFIG.CorridorWidth),
+    CFrame.new(-4, CONFIG.CorridorHeight/2, 0), Color3.fromRGB(20,20,25), Enum.Material.Metal)
+part("Parede final", Vector3.new(4, CONFIG.CorridorHeight, CONFIG.CorridorWidth),
+    CFrame.new(CONFIG.CorridorLength+2, CONFIG.CorridorHeight/2, 0), Color3.fromRGB(20,20,25), Enum.Material.Metal)
+
+local active = {}
+local function getRoot(character)
+    return character and character:FindFirstChild("HumanoidRootPart")
+end
+
+local function getHumanoid(character)
+    return character and character:FindFirstChildOfClass("Humanoid")
+end
+
+local function makeHead()
+    local userId
+    local ok, result = pcall(function()
+        return Players:GetUserIdFromNameAsync("W00byd0lx")
+    end)
+    if ok then userId = result end
+
+    local headPart
+    if userId then
+        local success, avatar = pcall(function()
+            return Players:CreateHumanoidModelFromUserId(userId)
+        end)
+        if success and avatar then
+            local sourceHead = avatar:FindFirstChild("Head")
+            if sourceHead and sourceHead:IsA("BasePart") then
+                headPart = sourceHead:Clone()
+            end
+            avatar:Destroy()
+        end
+    end
+
+    if not headPart then
+        headPart = Instance.new("Part")
+        headPart.Shape = Enum.PartType.Ball
+        headPart.Color = Color3.fromRGB(235, 190, 165)
+        headPart.Material = Enum.Material.SmoothPlastic
+    end
+
+    headPart.Name = "Cabeca gigante W00byd0lx"
+    headPart.Size = Vector3.new(40, 40, 40)
+    headPart.Anchored = true
+    headPart.CanCollide = false
+    headPart.CanTouch = false
+    headPart.CanQuery = true
+    headPart.CFrame = CFrame.new(CONFIG.PortalX-18, 27, 0) * CFrame.Angles(0, math.rad(90), 0)
+    headPart.Parent = folder
+    return headPart
+end
+
+local function freeze(humanoid, root)
+    humanoid:SetAttribute("W00byOldSpeed", humanoid.WalkSpeed)
+    humanoid:SetAttribute("W00byOldJump", humanoid.JumpPower)
+    humanoid.WalkSpeed = 0
+    humanoid.JumpPower = 0
+    humanoid.AutoRotate = false
+    root.Anchored = true
+end
+
+local function unfreeze(humanoid, root)
+    root.Anchored = false
+    humanoid.AutoRotate = true
+    humanoid.JumpPower = humanoid:GetAttribute("W00byOldJump") or 50
+end
+
+local function startSequence(player)
+    if active[player] then return end
+    local character = player.Character
+    local humanoid = getHumanoid(character)
+    local root = getRoot(character)
+    if not humanoid or not root then return end
+
+    active[player] = true
+    freeze(humanoid, root)
+    remote:FireClient(player, "DIALOGUE", "Olá jogador")
+    local head = makeHead()
+
+    task.delay(3, function()
+        if player.Parent then remote:FireClient(player, "DIALOGUE", "Sei que você ainda não me seguiu no Roblox") end
+    end)
+    task.delay(7, function()
+        if player.Parent then remote:FireClient(player, "DIALOGUE", "Então o que eu VOU fazer agora é por pura vingança:)") end
+    end)
+    task.delay(11, function()
+        if not player.Parent or not humanoid.Parent or not root.Parent then return end
+        remote:FireClient(player, "RUN")
+        unfreeze(humanoid, root)
+        humanoid.WalkSpeed = CONFIG.StartSpeed
+        local startTime = os.clock()
+        task.spawn(function()
+            while humanoid.Parent and os.clock() - startTime &lt; CONFIG.RampSeconds do
+                local alpha = math.clamp((os.clock() - startTime) / CONFIG.RampSeconds, 0, 1)
+                humanoid.WalkSpeed = CONFIG.StartSpeed + (CONFIG.MaxSpeed-CONFIG.StartSpeed)*alpha
+                task.wait(0.1)
+            end
+            if humanoid.Parent then humanoid.WalkSpeed = CONFIG.MaxSpeed end
+        end)
+
+        task.delay(3, function()
+            if player.Parent then remote:FireClient(player, "MUSIC", CONFIG.AudioId) end
+        end)
+
+        task.delay(CONFIG.ChaseDelay, function()
+            if not head or not head.Parent then return end
+            local chaseStart = os.clock()
+            local connection
+            connection = RunService.Heartbeat:Connect(function(dt)
+                if not head.Parent or not player.Parent or not root.Parent or not humanoid.Parent then
+                    if connection then connection:Disconnect() end
+                    return
+                end
+                if humanoid.Health &lt;= 0 then
+                    if connection then connection:Disconnect() end
+                    head:Destroy()
+                    active[player] = nil
+                    return
+                end
+
+                local speed = math.max(CONFIG.MaxSpeed, humanoid.WalkSpeed) + CONFIG.HeadSpeedBonus
+                local current = head.Position
+                local nextX = math.min(CONFIG.CorridorLength-35, current.X + speed*dt)
+                head.CFrame = CFrame.new(nextX, 27, 0) * CFrame.Angles(0, math.rad(90), 0)
+
+                local distance = (Vector3.new(root.Position.X, 27, 0) - head.Position).Magnitude
+                if distance &lt;= CONFIG.HeadCatchDistance then
+                    humanoid.Health = 0
+                    if connection then connection:Disconnect() end
+                    head:Destroy()
+                    active[player] = nil
+                    return
+                end
+                if root.Position.X &gt;= CONFIG.CorridorLength-25 then
+                    if connection then connection:Disconnect() end
+                    head:Destroy()
+                end
+            end)
+        end)
+    end)
+end
+
+trigger.Touched:Connect(function(hit)
+    local character = hit:FindFirstAncestorOfClass("Model")
+    local player = character and Players:GetPlayerFromCharacter(character)
+    if player and not active[player] then
+        local root = getRoot(character)
+        if root and root.Position.X &gt;= CONFIG.TriggerX-8 then
+            startSequence(player)
+        end
+    end
+end)
+
+local finishTouch = part("Zona de chegada", Vector3.new(10, 30, 90),
+    CFrame.new(CONFIG.CorridorLength-12, 15, 0), Color3.new(1,1,1), Enum.Material.SmoothPlastic)
+finishTouch.Transparency = 1
+finishTouch.CanCollide = false
+finishTouch.CanTouch = true
+finishTouch.Touched:Connect(function(hit)
+    local character = hit:FindFirstAncestorOfClass("Model")
+    local player = character and Players:GetPlayerFromCharacter(character)
+    if not player then return end
+    local root = getRoot(character)
+    local humanoid = getHumanoid(character)
+    if root and humanoid and humanoid.Health &gt; 0 then
+        root.CFrame = CFrame.new(CONFIG.CorridorLength+60, 4, 0)
+        root.AssemblyLinearVelocity = Vector3.zero
+        humanoid.WalkSpeed = 16
+        remote:FireClient(player, "WIN")
+    end
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+    active[player] = nil
+end)
+
+Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(function(character)
+        task.wait(0.5)
+        local humanoid = getHumanoid(character)
+        local root = getRoot(character)
+        if humanoid and root then
+            humanoid.WalkSpeed = CONFIG.StartSpeed
+            root.CFrame = CFrame.new(18, 5, 0)
+        end
+    end)
+end)
+
+print("FUJA DO W00BYD0LX: corredor e eventos criados.")
+</ProtectedString>
+        </Properties>
+      </Item>
+    </Item>
+    <Item class="StarterPlayer" referent="RBX2">
+      <Properties />
+      <Item class="StarterPlayerScripts" referent="RBX3">
+        <Properties />
+        <Item class="LocalScript" referent="RBX4">
+          <Properties>
+            <string name="Name">W00byCorridor_Client</string>
+            <ProtectedString name="Source">-- FUJA DO W00BYD0LX | Interface e audio do jogador
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
+local remote = ReplicatedStorage:WaitForChild("W00byCorridorEvent")
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "W00byCorridorUI"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.Parent = player:WaitForChild("PlayerGui")
+
+local dialogue = Instance.new("TextLabel")
+dialogue.Name = "Dialogue"
+dialogue.AnchorPoint = Vector2.new(0.5, 0.5)
+dialogue.Position = UDim2.fromScale(0.5, 0.78)
+dialogue.Size = UDim2.fromScale(0.82, 0.12)
+dialogue.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
+dialogue.BackgroundTransparency = 0.18
+dialogue.TextColor3 = Color3.fromRGB(255,255,255)
+dialogue.TextStrokeTransparency = 0.5
+dialogue.Font = Enum.Font.GothamBold
+dialogue.TextScaled = true
+dialogue.TextWrapped = true
+dialogue.Visible = false
+dialogue.Parent = gui
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 14)
+corner.Parent = dialogue
+
+local runLabel = Instance.new("TextLabel")
+runLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+runLabel.Position = UDim2.fromScale(0.5, 0.42)
+runLabel.Size = UDim2.fromScale(0.55, 0.2)
+runLabel.BackgroundTransparency = 1
+runLabel.Text = "RUN!"
+runLabel.TextColor3 = Color3.fromRGB(255, 40, 40)
+runLabel.TextStrokeTransparency = 0
+runLabel.Font = Enum.Font.GothamBlack
+runLabel.TextScaled = true
+runLabel.Visible = false
+runLabel.Parent = gui
+
+local music = Instance.new("Sound")
+music.Name = "Musica de fuga"
+music.SoundId = "rbxassetid://1837560230"
+music.Volume = 0.7
+music.Looped = true
+music.PlaybackSpeed = 0
+music.Parent = workspace.CurrentCamera
+
+local proximity = Instance.new("Sound")
+proximity.Name = "Som de aproximacao da cabeca"
+proximity.SoundId = "rbxassetid://9118823101"
+proximity.Volume = 0
+proximity.Looped = true
+proximity.Parent = workspace.CurrentCamera
+pcall(function() proximity:Play() end)
+
+local function showDialogue(message)
+    dialogue.Text = message
+    dialogue.Visible = true
+    dialogue.TextTransparency = 1
+    TweenService:Create(dialogue, TweenInfo.new(0.25), {TextTransparency = 0}):Play()
+    task.delay(3.4, function()
+        if dialogue.Text == message then
+            TweenService:Create(dialogue, TweenInfo.new(0.25), {TextTransparency = 1}):Play()
+            task.wait(0.3)
+            if dialogue.Text == message then dialogue.Visible = false end
+        end
+    end)
+end
+
+remote.OnClientEvent:Connect(function(action, value)
+    if action == "DIALOGUE" then
+        showDialogue(value)
+    elseif action == "RUN" then
+        dialogue.Visible = false
+        runLabel.Visible = true
+        task.delay(1, function() runLabel.Visible = false end)
+    elseif action == "MUSIC" then
+        music.SoundId = value or "rbxassetid://1837560230"
+        music.PlaybackSpeed = 0
+        music:Play()
+        local started = os.clock()
+        local connection
+        connection = RunService.RenderStepped:Connect(function()
+            local alpha = math.clamp((os.clock()-started)/10, 0, 1)
+            music.PlaybackSpeed = alpha
+            if alpha &gt;= 1 then connection:Disconnect() end
+        end)
+    elseif action == "WIN" then
+        music:Stop()
+        proximity:Stop()
+        showDialogue("VOCÊ GANHOU!")
+    end
+end)
+
+-- O som cresce conforme a cabeça se aproxima da camera/jogador.
+RunService.RenderStepped:Connect(function()
+    local head = workspace:FindFirstChild("W00byCorridor") and workspace.W00byCorridor:FindFirstChild("Cabeca gigante W00byd0lx")
+    local character = player.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    if head and root then
+        local distance = (head.Position-root.Position).Magnitude
+        local intensity = 1-math.clamp(distance/900, 0, 1)
+        proximity.Volume = intensity*0.65
+        proximity.PlaybackSpeed = 0.75 + intensity*0.6
+        if not proximity.IsPlaying then pcall(function() proximity:Play() end) end
+    else
+        proximity.Volume = 0
+    end
+end)
+</ProtectedString>
+          </Properties>
+        </Item>
+      </Item>
+    </Item>
+  </Item>
+</roblox>
