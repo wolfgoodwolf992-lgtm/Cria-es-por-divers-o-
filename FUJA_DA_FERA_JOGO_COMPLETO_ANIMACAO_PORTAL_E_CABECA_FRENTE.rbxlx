@@ -1,0 +1,541 @@
+<?xml version='1.0' encoding='utf-8'?>
+<roblox version="4">
+  <Item class="DataModel" referent="RBX0">
+    <Properties>
+      <string name="Name">FUJA DA FERA - JOGO COMPLETO</string>
+    </Properties>
+    <Item class="Workspace" referent="RBX1">
+      <Properties>
+        <string name="Name">Workspace</string>
+      </Properties>
+    </Item>
+    <Item class="ServerScriptService" referent="RBX2">
+      <Properties>
+        <string name="Name">ServerScriptService</string>
+      </Properties>
+      <Item class="Script" referent="RBX3">
+        <Properties>
+          <string name="Name">W00byCorridor_Server</string>
+          <ProtectedString name="Source">-- FUJA DO W00BYD0LX - servidor
+-- Corredor fechado em segmentos para evitar limites de tamanho de Parts.
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+
+local CFG = {
+    Length = 8000,
+    SegmentLength = 400,
+    Width = 64,
+    Height = 64,
+    StartX = 20,
+    TriggerX = 68,       -- 3,1 segundos a 16 studs/s
+    PortalX = 0,
+    StartSpeed = 16,
+    MaxSpeed = 100,
+    RampSeconds = 7,
+    ChaseDelay = 15,
+    CatchDistance = 4,
+    HeadSpeed = 119,
+    HeadInitialGap = 0,
+    AudioId = "rbxassetid://1837560230",
+}
+
+local previous = Workspace:FindFirstChild("W00byCorridor")
+if previous then previous:Destroy() end
+
+-- Remove o chão padrão que deixaria o jogador fora do corredor.
+local baseplate = Workspace:FindFirstChild("Baseplate")
+if baseplate and baseplate:IsA("BasePart") then baseplate:Destroy() end
+
+local map = Instance.new("Folder")
+map.Name = "W00byCorridor"
+map.Parent = Workspace
+
+local remote = ReplicatedStorage:FindFirstChild("W00byCorridorEvent")
+if not remote then
+    remote = Instance.new("RemoteEvent")
+    remote.Name = "W00byCorridorEvent"
+    remote.Parent = ReplicatedStorage
+end
+
+local function makePart(name, size, cf, color, material, parent, transparency, collide)
+    local p = Instance.new("Part")
+    p.Name = name
+    p.Size = size
+    p.CFrame = cf
+    p.Anchored = true
+    p.CanCollide = collide ~= false
+    p.CanTouch = true
+    p.Material = material or Enum.Material.Concrete
+    p.Color = color or Color3.fromRGB(35,35,43)
+    p.TopSurface = Enum.SurfaceType.Smooth
+    p.BottomSurface = Enum.SurfaceType.Smooth
+    p.Transparency = transparency or 0
+    p.Parent = parent or map
+    return p
+end
+
+-- Piso, teto e laterais montados em módulos sobrepostos.
+for x0 = 0, CFG.Length-1, CFG.SegmentLength do
+    local seg = math.min(CFG.SegmentLength+2, CFG.Length-x0+2)
+    local centerX = x0 + seg/2 - 1
+
+    makePart("Piso continuo "..x0, Vector3.new(seg,4,CFG.Width),
+        CFrame.new(centerX,-2,0), Color3.fromRGB(27,27,34), Enum.Material.Slate)
+    makePart("Teto continuo "..x0, Vector3.new(seg,4,CFG.Width),
+        CFrame.new(centerX,CFG.Height+2,0), Color3.fromRGB(18,18,24), Enum.Material.Metal)
+    makePart("Parede esquerda "..x0, Vector3.new(seg,CFG.Height,4),
+        CFrame.new(centerX,CFG.Height/2,-CFG.Width/2), Color3.fromRGB(31,31,40), Enum.Material.Metal)
+    makePart("Parede direita "..x0, Vector3.new(seg,CFG.Height,4),
+        CFrame.new(centerX,CFG.Height/2,CFG.Width/2), Color3.fromRGB(31,31,40), Enum.Material.Metal)
+end
+
+makePart("Parede fechada do inicio", Vector3.new(4,CFG.Height,CFG.Width),
+    CFrame.new(-4,CFG.Height/2,0), Color3.fromRGB(20,20,25), Enum.Material.Metal)
+
+-- Luzes dentro do corredor.
+for x = 40, CFG.Length-30, 120 do
+    local lamp = makePart("Luminaria", Vector3.new(28,1,10),
+        CFrame.new(x,CFG.Height-1,0), Color3.fromRGB(255,225,190), Enum.Material.Neon, map, 0, false)
+    local light = Instance.new("PointLight")
+    light.Brightness = 1.4
+    light.Range = 55
+    light.Color = Color3.fromRGB(255,220,180)
+    light.Parent = lamp
+end
+
+-- Spawn invisível no interior do corredor, no próprio início.
+local spawn = Instance.new("SpawnLocation")
+spawn.Name = "Checkpoint inicial"
+spawn.Size = Vector3.new(8,1,8)
+spawn.CFrame = CFrame.new(CFG.StartX,0.5,0)
+spawn.Anchored = true
+spawn.Neutral = true
+spawn.Duration = 0
+spawn.Transparency = 1
+spawn.CanCollide = false
+spawn.CanTouch = true
+spawn.Parent = map
+
+-- Portal à frente do jogador; o gatilho fica três segundos após o spawn.
+local portal = makePart("Portal roxo - moldura", Vector3.new(2,CFG.Height,CFG.Width),
+    CFrame.new(CFG.PortalX,CFG.Height/2,0), Color3.fromRGB(145,25,220), Enum.Material.Neon, map, 0.12, false)
+local portalCore = makePart("Portal roxo - energia", Vector3.new(1,CFG.Height-2,CFG.Width-2),
+    CFrame.new(CFG.PortalX+1,CFG.Height/2,0), Color3.fromRGB(35,0,65), Enum.Material.ForceField, map, 0.28, false)
+
+local portalLight = Instance.new("PointLight")
+portalLight.Name = "Brilho do portal"
+portalLight.Color = Color3.fromRGB(190,70,255)
+portalLight.Brightness = 2
+portalLight.Range = 42
+portalLight.Parent = portalCore
+
+local trigger = makePart("Gatilho da cena", Vector3.new(2,24,CFG.Width-8),
+    CFrame.new(CFG.TriggerX,12,0), Color3.new(1,1,1), Enum.Material.SmoothPlastic, map, 1, false)
+
+-- Chegada e placa física depois do corredor.
+local winRoom = Instance.new("Folder")
+winRoom.Name = "Sala de vitoria"
+winRoom.Parent = map
+makePart("Piso da vitoria", Vector3.new(140,4,180),
+    CFrame.new(CFG.Length+70,-2,0), Color3.fromRGB(35,95,65), Enum.Material.Grass, winRoom)
+makePart("Parede de fundo da vitoria", Vector3.new(4,42,180),
+    CFrame.new(CFG.Length+142,19,0), Color3.fromRGB(20,65,45), Enum.Material.Concrete, winRoom)
+local sign = makePart("Placa fisica - Voce ganhou", Vector3.new(48,18,2),
+    CFrame.new(CFG.Length+70,17,-65), Color3.fromRGB(20,115,65), Enum.Material.Wood, winRoom)
+local surface = Instance.new("SurfaceGui")
+surface.Face = Enum.NormalId.Front
+surface.AlwaysOnTop = true
+surface.Parent = sign
+local label = Instance.new("TextLabel")
+label.Size = UDim2.fromScale(1,1)
+label.BackgroundTransparency = 1
+label.Text = "VOCE GANHOU!"
+label.TextColor3 = Color3.new(1,1,1)
+label.TextScaled = true
+label.Font = Enum.Font.GothamBlack
+label.Parent = surface
+
+makePart("Parede fechada do final", Vector3.new(4,CFG.Height,CFG.Width),
+    CFrame.new(CFG.Length+2,CFG.Height/2,0), Color3.fromRGB(20,20,25), Enum.Material.Metal)
+local finish = makePart("Zona invisivel de chegada", Vector3.new(10,30,CFG.Width-10),
+    CFrame.new(CFG.Length-12,15,0), Color3.new(1,1,1), Enum.Material.SmoothPlastic, map, 1, false)
+
+local active = {}
+local won = {}
+local warningTier = {}
+
+local function getHumanoid(char)
+    return char and char:FindFirstChildOfClass("Humanoid")
+end
+local function getRoot(char)
+    return char and char:FindFirstChild("HumanoidRootPart")
+end
+
+local function createHead()
+    local head
+    local okId, userId = pcall(function()
+        return Players:GetUserIdFromNameAsync("W00byd0lx")
+    end)
+    if okId and userId then
+        local okAvatar, avatar = pcall(function()
+            return Players:CreateHumanoidModelFromUserId(userId)
+        end)
+        if okAvatar and avatar then
+            local sourceHead = avatar:FindFirstChild("Head")
+            if sourceHead and sourceHead:IsA("BasePart") then
+                head = sourceHead:Clone()
+            end
+            avatar:Destroy()
+        end
+    end
+    if not head then
+        head = Instance.new("Part")
+        head.Shape = Enum.PartType.Ball
+        head.Color = Color3.fromRGB(235,190,165)
+        head.Material = Enum.Material.SmoothPlastic
+    end
+    head.Name = "Cabeca gigante W00byd0lx"
+    head.Size = Vector3.new(40,40,40)
+    head.Anchored = true
+    head.CanCollide = false
+    head.CanTouch = false
+    head.Parent = map
+
+    -- A face olha para +X (lado do jogador) desde o primeiro instante.
+    -- A cabeça começa atrás do portal e atravessa a abertura com uma animação.
+    local hiddenPosition = Vector3.new(CFG.PortalX-28,32,0)
+    local emergedPosition = Vector3.new(CFG.PortalX+22,32,0)
+    local function facingPlayer(position)
+        return CFrame.lookAt(position, position + Vector3.new(1,0,0))
+    end
+    head.CFrame = facingPlayer(hiddenPosition)
+    head.Transparency = 1
+
+    local emergeInfo = TweenInfo.new(2.8, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+    local emergeTween = TweenService:Create(head, emergeInfo, {
+        CFrame = facingPlayer(emergedPosition),
+        Transparency = 0
+    })
+    emergeTween:Play()
+
+    return head
+end
+
+local function beginScene(player)
+    if active[player] or won[player] then return end
+    local character = player.Character
+    local humanoid = getHumanoid(character)
+    local root = getRoot(character)
+    if not humanoid or not root then return end
+
+    active[player] = true
+    warningTier[player] = 0
+    humanoid:SetAttribute("OldJumpPower",humanoid.JumpPower)
+    humanoid.WalkSpeed = 0
+    humanoid.JumpPower = 0
+    humanoid.AutoRotate = false
+    root.Anchored = true
+
+    local head = createHead()
+    remote:FireClient(player,"DIALOGUE","Olá jogador")
+    task.delay(3,function()
+        if player.Parent then remote:FireClient(player,"DIALOGUE","Sei que você ainda não me seguiu no Roblox") end
+    end)
+    task.delay(7,function()
+        if player.Parent then remote:FireClient(player,"DIALOGUE","Então o que eu VOU fazer agora é por pura vingança:)") end
+    end)
+
+    task.delay(11,function()
+        if not player.Parent or not humanoid.Parent or not root.Parent then return end
+        root.Anchored = false
+        humanoid.AutoRotate = true
+        humanoid.JumpPower = humanoid:GetAttribute("OldJumpPower") or 50
+        humanoid.WalkSpeed = CFG.StartSpeed
+        remote:FireClient(player,"RUN")
+
+        local rampStart = os.clock()
+        task.spawn(function()
+            while humanoid.Parent and os.clock()-rampStart &lt; CFG.RampSeconds do
+                local alpha = math.clamp((os.clock()-rampStart)/CFG.RampSeconds,0,1)
+                humanoid.WalkSpeed = CFG.StartSpeed + (CFG.MaxSpeed-CFG.StartSpeed)*alpha
+                task.wait(0.08)
+            end
+            if humanoid.Parent then humanoid.WalkSpeed = CFG.MaxSpeed end
+        end)
+
+        task.delay(3,function()
+            if player.Parent then remote:FireClient(player,"MUSIC",CFG.AudioId) end
+        end)
+
+        -- A cabeça fica parada no portal durante a fala. Quando começa a perseguição,
+        -- surge atrás do jogador com distância suficiente para uma corrida longa.
+        task.delay(CFG.ChaseDelay,function()
+            if not head or not head.Parent or not root.Parent or humanoid.Health &lt;= 0 then return end
+            local startX = CFG.PortalX+22
+            head.CFrame = CFrame.lookAt(Vector3.new(startX,32,0), Vector3.new(startX+1,32,0))
+
+            local connection
+            connection = RunService.Heartbeat:Connect(function(dt)
+                if not head.Parent or not player.Parent or not root.Parent or not humanoid.Parent then
+                    connection:Disconnect()
+                    return
+                end
+                if humanoid.Health &lt;= 0 then
+                    connection:Disconnect()
+                    head:Destroy()
+                    active[player] = nil
+                    return
+                end
+
+                local nextX = math.min(CFG.Length-30,head.Position.X+CFG.HeadSpeed*dt)
+                head.CFrame = CFrame.lookAt(Vector3.new(nextX,32,0), Vector3.new(nextX+1,32,0))
+
+                local gap = root.Position.X - head.Position.X
+
+                -- Avisos acumulativos: cada novo nível mantém os anteriores na tela.
+                local tier = 0
+                if gap &lt;= 180 then tier = 1 end
+                if gap &lt;= 100 then tier = 2 end
+                if gap &lt;= 45 then tier = 3 end
+                if tier &gt; (warningTier[player] or 0) then
+                    warningTier[player] = tier
+                    remote:FireClient(player,"PROXIMITY",tier)
+                end
+
+                if gap &lt;= CFG.CatchDistance then
+                    humanoid.Health = 0
+                    connection:Disconnect()
+                    head:Destroy()
+                    active[player] = nil
+                    warningTier[player] = nil
+                    return
+                end
+                if root.Position.X &gt;= CFG.Length-25 then
+                    connection:Disconnect()
+                    head:Destroy()
+                end
+            end)
+        end)
+    end)
+end
+
+trigger.Touched:Connect(function(hit)
+    local char = hit:FindFirstAncestorOfClass("Model")
+    local player = char and Players:GetPlayerFromCharacter(char)
+    if not player or active[player] or won[player] then return end
+    local root = getRoot(char)
+    if root and root.Position.X &gt;= CFG.TriggerX-1 then
+        beginScene(player)
+    end
+end)
+
+finish.Touched:Connect(function(hit)
+    local char = hit:FindFirstAncestorOfClass("Model")
+    local player = char and Players:GetPlayerFromCharacter(char)
+    if not player or won[player] then return end
+    local root = getRoot(char)
+    local humanoid = getHumanoid(char)
+    if root and humanoid and humanoid.Health &gt; 0 then
+        won[player] = true
+        warningTier[player] = nil
+        root.CFrame = CFrame.new(CFG.Length+70,5,0)
+        root.AssemblyLinearVelocity = Vector3.zero
+        humanoid.WalkSpeed = 16
+        remote:FireClient(player,"WIN")
+    end
+end)
+
+local function placeCharacter(player, character)
+    task.wait(0.4)
+    local humanoid = getHumanoid(character)
+    local root = getRoot(character)
+    if humanoid and root then
+        humanoid.WalkSpeed = CFG.StartSpeed
+        root.CFrame = CFrame.lookAt(Vector3.new(CFG.StartX,5,0),Vector3.new(CFG.StartX+1,5,0))
+        root.AssemblyLinearVelocity = Vector3.zero
+    end
+end
+
+Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(function(character)
+        placeCharacter(player,character)
+    end)
+end)
+for _,player in ipairs(Players:GetPlayers()) do
+    player.CharacterAdded:Connect(function(character)
+        placeCharacter(player,character)
+    end)
+    if player.Character then task.spawn(placeCharacter,player,player.Character) end
+end
+
+Players.PlayerRemoving:Connect(function(player)
+    active[player] = nil
+    won[player] = nil
+    warningTier[player] = nil
+end)
+
+print("FUJA DO W00BYD0LX: corredor modular fechado criado.")
+</ProtectedString>
+        </Properties>
+      </Item>
+    </Item>
+    <Item class="StarterPlayer" referent="RBX4">
+      <Properties>
+        <string name="Name">StarterPlayer</string>
+      </Properties>
+      <Item class="StarterPlayerScripts" referent="RBX5">
+        <Properties>
+          <string name="Name">StarterPlayerScripts</string>
+        </Properties>
+        <Item class="LocalScript" referent="RBX6">
+          <Properties>
+            <string name="Name">W00byCorridor_Client</string>
+            <ProtectedString name="Source">-- FUJA DO W00BYD0LX - interface e musica (sem som de aproximacao)
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
+local remote = ReplicatedStorage:WaitForChild("W00byCorridorEvent")
+
+local screen = Instance.new("ScreenGui")
+screen.Name = "W00byCorridorUI"
+screen.ResetOnSpawn = false
+screen.IgnoreGuiInset = true
+screen.Parent = player:WaitForChild("PlayerGui")
+
+local dialogue = Instance.new("TextLabel")
+dialogue.Name = "Dialogue"
+dialogue.AnchorPoint = Vector2.new(0.5,0.5)
+dialogue.Position = UDim2.fromScale(0.5,0.78)
+dialogue.Size = UDim2.fromScale(0.82,0.12)
+dialogue.BackgroundColor3 = Color3.fromRGB(8,8,12)
+dialogue.BackgroundTransparency = 0.18
+dialogue.TextColor3 = Color3.new(1,1,1)
+dialogue.TextStrokeTransparency = 0.5
+dialogue.Font = Enum.Font.GothamBold
+dialogue.TextScaled = true
+dialogue.TextWrapped = true
+dialogue.Visible = false
+dialogue.Parent = screen
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0,14)
+corner.Parent = dialogue
+
+local runText = Instance.new("TextLabel")
+runText.AnchorPoint = Vector2.new(0.5,0.5)
+runText.Position = UDim2.fromScale(0.5,0.42)
+runText.Size = UDim2.fromScale(0.55,0.2)
+runText.BackgroundTransparency = 1
+runText.Text = "RUN!"
+runText.TextColor3 = Color3.fromRGB(255,40,40)
+runText.TextStrokeTransparency = 0
+runText.Font = Enum.Font.GothamBlack
+runText.TextScaled = true
+runText.Visible = false
+runText.Parent = screen
+
+-- Alertas de proximidade fixos no centro, em coluna e sem rotações aleatórias.
+local warningLabels = {}
+local warningTexts = {"CORRA!", "NÃO OLHE PARA TRÁS", "FUJA!"}
+local warningY = {0.34, 0.43, 0.52}
+for i = 1, 3 do
+    local warning = Instance.new("TextLabel")
+    warning.Name = "AvisoProximidade"..i
+    warning.AnchorPoint = Vector2.new(0.5,0.5)
+    warning.Position = UDim2.fromScale(0.5,warningY[i])
+    warning.Size = UDim2.fromScale(0.9,0.09)
+    warning.BackgroundTransparency = 1
+    warning.Text = warningTexts[i]
+    warning.TextColor3 = Color3.fromRGB(255,35,35)
+    warning.TextStrokeColor3 = Color3.new(0,0,0)
+    warning.TextStrokeTransparency = 0.05
+    warning.Font = Enum.Font.GothamBlack
+    warning.TextScaled = true
+    warning.Visible = false
+    warning.Parent = screen
+    warningLabels[i] = warning
+end
+
+local warningShake = false
+local shakeClock = 0
+
+local music = Instance.new("Sound")
+music.Name = "Musica de fuga"
+music.SoundId = "rbxassetid://1837560230"
+music.Volume = 0.7
+music.Looped = true
+music.PlaybackSpeed = 0.05
+music.Parent = workspace.CurrentCamera
+
+RunService.RenderStepped:Connect(function(dt)
+    if not warningShake then return end
+    shakeClock += dt * 34
+    for i, warning in ipairs(warningLabels) do
+        if warning.Visible then
+            local dx = math.sin(shakeClock + i*1.7) * 0.004
+            local dy = math.cos(shakeClock*1.13 + i) * 0.003
+            warning.Position = UDim2.fromScale(0.5 + dx, warningY[i] + dy)
+        end
+    end
+end)
+
+local function showDialogue(message)
+    dialogue.Text = message
+    dialogue.Visible = true
+    dialogue.TextTransparency = 1
+    TweenService:Create(dialogue,TweenInfo.new(0.25),{TextTransparency=0}):Play()
+    task.delay(3.4,function()
+        if dialogue.Text == message then
+            TweenService:Create(dialogue,TweenInfo.new(0.25),{TextTransparency=1}):Play()
+            task.wait(0.3)
+            if dialogue.Text == message then dialogue.Visible=false end
+        end
+    end)
+end
+
+remote.OnClientEvent:Connect(function(action,value)
+    if action == "DIALOGUE" then
+        showDialogue(value)
+    elseif action == "RUN" then
+        dialogue.Visible = false
+        runText.Visible = true
+        task.delay(0.2,function()
+            runText.Visible = false
+        end)
+    elseif action == "PROXIMITY" then
+        local tier = math.clamp(tonumber(value) or 0,0,3)
+        for i = 1, 3 do
+            warningLabels[i].Visible = (i &lt;= tier)
+            warningLabels[i].Position = UDim2.fromScale(0.5,warningY[i])
+        end
+        warningShake = tier &gt; 0
+    elseif action == "MUSIC" then
+        music.SoundId = value or "rbxassetid://1837560230"
+        music.PlaybackSpeed = 0.05
+        music:Play()
+        local started = os.clock()
+        local connection
+        connection = RunService.RenderStepped:Connect(function()
+            local alpha = math.clamp((os.clock()-started)/10,0,1)
+            music.PlaybackSpeed = 0.05 + (1-0.05)*alpha
+            if alpha &gt;= 1 then connection:Disconnect() end
+        end)
+    elseif action == "WIN" then
+        warningShake = false
+        for _, warning in ipairs(warningLabels) do warning.Visible = false end
+        music:Stop()
+        showDialogue("VOCÊ GANHOU!")
+    end
+end)
+</ProtectedString>
+          </Properties>
+        </Item>
+      </Item>
+    </Item>
+  </Item>
+</roblox>
