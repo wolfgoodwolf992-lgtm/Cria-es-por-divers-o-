@@ -1,0 +1,329 @@
+<?xml version="1.0" encoding="utf-8"?><roblox version="4"><Item class="Workspace"><Properties><string name="Name">Workspace</string></Properties></Item><Item class="ReplicatedStorage"><Properties><string name="Name">ReplicatedStorage</string></Properties></Item><Item class="ServerScriptService"><Properties><string name="Name">ServerScriptService</string></Properties><Item class="Script"><Properties><string name="Name">SchoolIntroServer</string><bool name="Disabled">false</bool><ProtectedString name="Source">local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+
+local function getOrCreate(parent, className, name)
+	local obj = parent:FindFirstChild(name)
+	if not obj then
+		obj = Instance.new(className)
+		obj.Name = name
+		obj.Parent = parent
+	end
+	return obj
+end
+
+local remotes = getOrCreate(ReplicatedStorage, "Folder", "IntroRemotes")
+local ClientLoaded = getOrCreate(remotes, "RemoteEvent", "ClientLoaded")
+local IntroEvent = getOrCreate(remotes, "RemoteEvent", "IntroEvent")
+
+local INTRO_DURATION = 10
+local FADE_DURATION = 1.5
+local BLACK_DURATION = 3
+local ready = {}
+local started = false
+
+local function part(parent, name, size, cframe, color, material)
+	local p = Instance.new("Part")
+	p.Name = name
+	p.Size = size
+	p.CFrame = cframe
+	p.Anchored = true
+	p.Color = color
+	p.Material = material or Enum.Material.SmoothPlastic
+	p.TopSurface = Enum.SurfaceType.Smooth
+	p.BottomSurface = Enum.SurfaceType.Smooth
+	p.Parent = parent
+	return p
+end
+
+local scene = workspace:FindFirstChild("SchoolIntroScene")
+if not scene then
+	scene = Instance.new("Folder")
+	scene.Name = "SchoolIntroScene"
+	scene.Parent = workspace
+
+	-- Grounds and road
+	part(scene, "Ground", Vector3.new(220, 1, 220), CFrame.new(0, -0.6, 0), Color3.fromRGB(88, 135, 79), Enum.Material.Grass)
+	part(scene, "Road", Vector3.new(26, 0.3, 150), CFrame.new(0, 0.05, 28), Color3.fromRGB(48, 48, 52), Enum.Material.Asphalt)
+	for z = -35, 95, 18 do
+		part(scene, "RoadMarking", Vector3.new(0.5, 0.05, 8), CFrame.new(0, 0.23, z), Color3.fromRGB(240, 225, 150), Enum.Material.Neon)
+	end
+
+	-- School building
+	part(scene, "SchoolMain", Vector3.new(76, 24, 18), CFrame.new(0, 12, -38), Color3.fromRGB(222, 207, 174), Enum.Material.Brick)
+	part(scene, "SchoolRoof", Vector3.new(82, 2, 22), CFrame.new(0, 25, -38), Color3.fromRGB(91, 49, 42), Enum.Material.Slate)
+	part(scene, "Entrance", Vector3.new(14, 13, 1), CFrame.new(0, 7.5, -28.4), Color3.fromRGB(74, 105, 135), Enum.Material.Glass)
+	part(scene, "LeftWing", Vector3.new(3, 20, 18), CFrame.new(-28, 10, -27), Color3.fromRGB(190, 177, 150), Enum.Material.Brick)
+	part(scene, "RightWing", Vector3.new(3, 20, 18), CFrame.new(28, 10, -27), Color3.fromRGB(190, 177, 150), Enum.Material.Brick)
+	part(scene, "Sign", Vector3.new(26, 4, 0.8), CFrame.new(0, 23, -28.7), Color3.fromRGB(25, 67, 105), Enum.Material.SmoothPlastic)
+	local sign = Instance.new("SurfaceGui")
+	sign.Face = Enum.NormalId.Front
+	sign.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	sign.PixelsPerStud = 45
+	sign.Parent = scene.Sign
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.fromScale(1, 1)
+	label.BackgroundTransparency = 1
+	label.Text = "ESCOLA"
+	label.TextColor3 = Color3.new(1, 1, 1)
+	label.TextScaled = true
+	label.Font = Enum.Font.GothamBold
+	label.Parent = sign
+
+	-- Bus model; all parts are anchored and moved together with PivotTo.
+	local bus = Instance.new("Model")
+	bus.Name = "SchoolBus"
+	bus.Parent = scene
+	local root = part(bus, "BusRoot", Vector3.new(14, 0.5, 28), CFrame.new(0, 4, 85), Color3.fromRGB(255, 190, 35), Enum.Material.Metal)
+	bus.PrimaryPart = root
+	part(bus, "BusBody", Vector3.new(13, 8, 27), CFrame.new(0, 8, 85), Color3.fromRGB(255, 190, 35), Enum.Material.Metal)
+	part(bus, "BusRoof", Vector3.new(12.5, 0.6, 26), CFrame.new(0, 12.2, 85), Color3.fromRGB(255, 198, 45), Enum.Material.Metal)
+	part(bus, "FrontGlass", Vector3.new(11, 3.2, 0.25), CFrame.new(0, 9.7, 71.35), Color3.fromRGB(80, 145, 180), Enum.Material.Glass)
+	part(bus, "RearGlass", Vector3.new(11, 3.2, 0.25), CFrame.new(0, 9.7, 98.65), Color3.fromRGB(80, 145, 180), Enum.Material.Glass)
+	for _, x in ipairs({-6.58, 6.58}) do
+		for _, z in ipairs({76, 83, 90, 97}) do
+			part(bus, "Window", Vector3.new(0.2, 3.2, 5.2), CFrame.new(x, 9.6, z), Color3.fromRGB(75, 135, 170), Enum.Material.Glass)
+		end
+		for _, z in ipairs({77, 94}) do
+			local wheel = part(bus, "Wheel", Vector3.new(2.2, 3.8, 3.8), CFrame.new(x * 1.03, 3.2, z), Color3.fromRGB(28, 28, 30), Enum.Material.Rubber)
+			wheel.Shape = Enum.PartType.Cylinder
+			wheel.CFrame = CFrame.new(x * 1.03, 3.2, z) * CFrame.Angles(0, 0, math.rad(90))
+		end
+	end
+	part(bus, "Bumper", Vector3.new(14, 0.8, 1), CFrame.new(0, 4.5, 70.8), Color3.fromRGB(165, 165, 165), Enum.Material.Metal)
+	part(bus, "StopSign", Vector3.new(0.5, 3, 3), CFrame.new(7.2, 8, 86), Color3.fromRGB(190, 35, 35), Enum.Material.Metal)
+end
+
+local busModel = scene:WaitForChild("SchoolBus")
+local busRoot = busModel.PrimaryPart or busModel:FindFirstChild("BusRoot")
+if busRoot then busModel.PrimaryPart = busRoot end
+local startPivot = busModel:GetPivot()
+local endPivot = CFrame.new(0, 4, -2)
+
+local function teleportAll()
+	local spawnBase = CFrame.new(0, 3, 14)
+	local index = 0
+	for _, player in ipairs(Players:GetPlayers()) do
+		local character = player.Character
+		local root = character and character:FindFirstChild("HumanoidRootPart")
+		if root then
+			index += 1
+			local col = ((index - 1) % 4) - 1.5
+			local row = math.floor((index - 1) / 4)
+			local target = spawnBase * CFrame.new(col * 5, 0, row * 5)
+			character:PivotTo(target)
+			root.AssemblyLinearVelocity = Vector3.zero
+			root.AssemblyAngularVelocity = Vector3.zero
+		end
+	end
+end
+
+local function allPlayersReady()
+	local current = Players:GetPlayers()
+	if #current == 0 then return false end
+	for _, player in ipairs(current) do
+		if ready[player] ~= true then return false end
+	end
+	return true
+end
+
+local function beginIntro()
+	if started or not allPlayersReady() then return end
+	started = true
+
+	local startAt = workspace:GetServerTimeNow() + 1
+	IntroEvent:FireAllClients("Begin", startAt, INTRO_DURATION)
+	task.wait(math.max(0, startAt - workspace:GetServerTimeNow()))
+
+	-- Bus movement is authoritative and replicated to every player.
+	local value = Instance.new("CFrameValue")
+	value.Value = startPivot
+	local connection = value:GetPropertyChangedSignal("Value"):Connect(function()
+		if busModel.Parent then busModel:PivotTo(value.Value) end
+	end)
+	local tween = TweenService:Create(value, TweenInfo.new(INTRO_DURATION, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {Value = endPivot})
+	tween:Play()
+	tween.Completed:Wait()
+	connection:Disconnect()
+	value:Destroy()
+	busModel:PivotTo(endPivot)
+
+	IntroEvent:FireAllClients("FadeOut", FADE_DURATION)
+	task.wait(FADE_DURATION)
+	teleportAll()
+	task.wait(BLACK_DURATION)
+	IntroEvent:FireAllClients("Reveal", FADE_DURATION)
+	task.wait(FADE_DURATION)
+	IntroEvent:FireAllClients("Finished")
+end
+
+Players.PlayerAdded:Connect(function(player)
+	ready[player] = false
+end)
+Players.PlayerRemoving:Connect(function(player)
+	ready[player] = nil
+	if not started then task.defer(beginIntro) end
+end)
+
+for _, player in ipairs(Players:GetPlayers()) do ready[player] = false end
+
+ClientLoaded.OnServerEvent:Connect(function(player)
+	if started or not player.Parent then return end
+	ready[player] = true
+	if allPlayersReady() then task.spawn(beginIntro) end
+end)
+
+-- Recheck if the server becomes ready after a player leaves.
+task.defer(function()
+	while not started do
+		task.wait(0.5)
+		if allPlayersReady() then beginIntro() end
+	end
+end)
+</ProtectedString></Properties></Item></Item><Item class="StarterPlayer"><Properties><string name="Name">StarterPlayer</string></Properties><Item class="StarterPlayerScripts"><Properties><string name="Name">StarterPlayerScripts</string></Properties><Item class="LocalScript"><Properties><string name="Name">SchoolIntroClient</string><bool name="Disabled">false</bool><ProtectedString name="Source">local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ContentProvider = game:GetService("ContentProvider")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local remotes = ReplicatedStorage:WaitForChild("IntroRemotes")
+local ClientLoaded = remotes:WaitForChild("ClientLoaded")
+local IntroEvent = remotes:WaitForChild("IntroEvent")
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "SchoolIntroGui"
+gui.IgnoreGuiInset = true
+gui.ResetOnSpawn = false
+gui.DisplayOrder = 10000
+gui.Parent = player:WaitForChild("PlayerGui")
+
+local background = Instance.new("Frame")
+background.Name = "BlackScreen"
+background.Size = UDim2.fromScale(1, 1)
+background.BackgroundColor3 = Color3.new(0, 0, 0)
+background.BorderSizePixel = 0
+background.BackgroundTransparency = 0
+background.Parent = gui
+
+local message = Instance.new("TextLabel")
+message.Name = "LoadingMessage"
+message.AnchorPoint = Vector2.new(0.5, 0.5)
+message.Position = UDim2.fromScale(0.5, 0.52)
+message.Size = UDim2.fromScale(0.9, 0.12)
+message.BackgroundTransparency = 1
+message.Text = "Esperando jogadores carregarem..."
+message.TextColor3 = Color3.new(1, 1, 1)
+message.TextScaled = true
+message.Font = Enum.Font.GothamMedium
+message.Parent = background
+
+local camera = workspace.CurrentCamera
+local oldCameraType = camera.CameraType
+local oldCameraSubject = camera.CameraSubject
+local renderConnection
+local activeTweens = {}
+
+local function fadeTo(transparency, duration)
+	for _, tween in ipairs(activeTweens) do tween:Cancel() end
+	table.clear(activeTweens)
+	local tween = TweenService:Create(background, TweenInfo.new(duration, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
+		BackgroundTransparency = transparency
+	})
+	table.insert(activeTweens, tween)
+	tween:Play()
+	return tween
+end
+
+-- Wait for the local game and its initial character, then preload scene assets.
+if not game:IsLoaded() then game.Loaded:Wait() end
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid", 15)
+local root = character:WaitForChild("HumanoidRootPart", 15)
+if humanoid and root then
+	humanoid.WalkSpeed = 0
+	humanoid.JumpPower = 0
+	humanoid.AutoRotate = false
+end
+
+pcall(function()
+	ContentProvider:PreloadAsync({workspace:WaitForChild("SchoolIntroScene")})
+end)
+
+-- The server, not this client, decides when everybody is ready.
+ClientLoaded:FireServer()
+
+local function lockCharacter(locked)
+	local char = player.Character
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	if hum then
+		if locked then
+			hum:SetAttribute("IntroOldWalkSpeed", hum.WalkSpeed)
+			hum:SetAttribute("IntroOldJumpPower", hum.JumpPower)
+			hum.WalkSpeed = 0
+			hum.JumpPower = 0
+			hum.AutoRotate = false
+		else
+			hum.WalkSpeed = hum:GetAttribute("IntroOldWalkSpeed") or 16
+			hum.JumpPower = hum:GetAttribute("IntroOldJumpPower") or 50
+			hum.AutoRotate = true
+			hum:SetAttribute("IntroOldWalkSpeed", nil)
+			hum:SetAttribute("IntroOldJumpPower", nil)
+		end
+	end
+end
+
+local function startCamera(startAt, duration)
+	message.Visible = false
+	lockCharacter(true)
+	fadeTo(1, 1.2)
+	camera = workspace.CurrentCamera
+	camera.CameraType = Enum.CameraType.Scriptable
+
+	local startCam = CFrame.lookAt(Vector3.new(28, 15, 70), Vector3.new(0, 8, 48))
+	local endCam = CFrame.lookAt(Vector3.new(23, 11, 10), Vector3.new(0, 7, -2))
+	if renderConnection then renderConnection:Disconnect() end
+	renderConnection = RunService.RenderStepped:Connect(function()
+		local alpha = math.clamp((workspace:GetServerTimeNow() - startAt) / duration, 0, 1)
+		local eased = alpha * alpha * (3 - 2 * alpha)
+		camera.CFrame = startCam:Lerp(endCam, eased)
+	end)
+end
+
+IntroEvent.OnClientEvent:Connect(function(action, a, b)
+	if action == "Begin" then
+		startCamera(a, b)
+	elseif action == "FadeOut" then
+		fadeTo(0, a)
+	elseif action == "Reveal" then
+		if renderConnection then renderConnection:Disconnect(); renderConnection = nil end
+		camera = workspace.CurrentCamera
+		local char = player.Character
+		local hum = char and char:FindFirstChildOfClass("Humanoid")
+		camera.CameraType = Enum.CameraType.Custom
+		if hum then camera.CameraSubject = hum end
+		lockCharacter(false)
+		fadeTo(1, a)
+	elseif action == "Finished" then
+		if renderConnection then renderConnection:Disconnect(); renderConnection = nil end
+		camera = workspace.CurrentCamera
+		local char = player.Character
+		local hum = char and char:FindFirstChildOfClass("Humanoid")
+		camera.CameraType = Enum.CameraType.Custom
+		if hum then camera.CameraSubject = hum end
+		lockCharacter(false)
+		gui:Destroy()
+	end
+end)
+
+player.CharacterAdded:Connect(function(newCharacter)
+	if background.Parent then
+		local hum = newCharacter:WaitForChild("Humanoid", 10)
+		if hum then
+			hum.WalkSpeed = 0
+			hum.JumpPower = 0
+			hum.AutoRotate = false
+		end
+	end
+end)
+</ProtectedString></Properties></Item></Item></Item></roblox>
