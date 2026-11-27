@@ -1,4 +1,5 @@
-<?xml version="1.0" encoding="utf-8"?><roblox version="4"><Item class="Workspace"><Properties><string name="Name">Workspace</string></Properties></Item><Item class="ReplicatedStorage"><Properties><string name="Name">ReplicatedStorage</string></Properties></Item><Item class="ServerScriptService"><Properties><string name="Name">ServerScriptService</string></Properties><Item class="Script"><Properties><string name="Name">SchoolIntroServer</string><bool name="Disabled">false</bool><ProtectedString name="Source">local Players = game:GetService("Players")
+<?xml version='1.0' encoding='utf-8'?>
+<roblox version="4"><Item class="Workspace"><Properties><string name="Name">Workspace</string></Properties></Item><Item class="ReplicatedStorage"><Properties><string name="Name">ReplicatedStorage</string></Properties></Item><Item class="ServerScriptService"><Properties><string name="Name">ServerScriptService</string></Properties><Item class="Script"><Properties><string name="Name">SchoolIntroServer</string><bool name="Disabled">false</bool><ProtectedString name="Source">local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
@@ -74,31 +75,31 @@ if not scene then
 	local bus = Instance.new("Model")
 	bus.Name = "SchoolBus"
 	bus.Parent = scene
-	local root = part(bus, "BusRoot", Vector3.new(14, 0.5, 28), CFrame.new(0, 4, 85), Color3.fromRGB(255, 190, 35), Enum.Material.Metal)
+	local root = part(bus, "BusRoot", Vector3.new(14, 0.5, 28), CFrame.new(0, 2.5, 85), Color3.fromRGB(255, 190, 35), Enum.Material.Metal)
 	bus.PrimaryPart = root
-	part(bus, "BusBody", Vector3.new(13, 8, 27), CFrame.new(0, 8, 85), Color3.fromRGB(255, 190, 35), Enum.Material.Metal)
-	part(bus, "BusRoof", Vector3.new(12.5, 0.6, 26), CFrame.new(0, 12.2, 85), Color3.fromRGB(255, 198, 45), Enum.Material.Metal)
-	part(bus, "FrontGlass", Vector3.new(11, 3.2, 0.25), CFrame.new(0, 9.7, 71.35), Color3.fromRGB(80, 145, 180), Enum.Material.Glass)
-	part(bus, "RearGlass", Vector3.new(11, 3.2, 0.25), CFrame.new(0, 9.7, 98.65), Color3.fromRGB(80, 145, 180), Enum.Material.Glass)
+	part(bus, "BusBody", Vector3.new(13, 8, 27), CFrame.new(0, 6.5, 85), Color3.fromRGB(255, 190, 35), Enum.Material.Metal)
+	part(bus, "BusRoof", Vector3.new(12.5, 0.6, 26), CFrame.new(0, 10.7, 85), Color3.fromRGB(255, 198, 45), Enum.Material.Metal)
+	part(bus, "FrontGlass", Vector3.new(11, 3.2, 0.25), CFrame.new(0, 8.2, 71.35), Color3.fromRGB(80, 145, 180), Enum.Material.Glass)
+	part(bus, "RearGlass", Vector3.new(11, 3.2, 0.25), CFrame.new(0, 8.2, 98.65), Color3.fromRGB(80, 145, 180), Enum.Material.Glass)
 	for _, x in ipairs({-6.58, 6.58}) do
 		for _, z in ipairs({76, 83, 90, 97}) do
-			part(bus, "Window", Vector3.new(0.2, 3.2, 5.2), CFrame.new(x, 9.6, z), Color3.fromRGB(75, 135, 170), Enum.Material.Glass)
+			part(bus, "Window", Vector3.new(0.2, 3.2, 5.2), CFrame.new(x, 8.1, z), Color3.fromRGB(75, 135, 170), Enum.Material.Glass)
 		end
 		for _, z in ipairs({77, 94}) do
-			local wheel = part(bus, "Wheel", Vector3.new(2.2, 3.8, 3.8), CFrame.new(x * 1.03, 3.2, z), Color3.fromRGB(28, 28, 30), Enum.Material.Rubber)
+			local wheel = part(bus, "Wheel", Vector3.new(2.2, 3.8, 3.8), CFrame.new(x * 1.03, 1.7, z), Color3.fromRGB(28, 28, 30), Enum.Material.Rubber)
 			wheel.Shape = Enum.PartType.Cylinder
-			wheel.CFrame = CFrame.new(x * 1.03, 3.2, z) * CFrame.Angles(0, 0, math.rad(90))
+			wheel.CFrame = CFrame.new(x * 1.03, 1.7, z) * CFrame.Angles(0, 0, math.rad(90))
 		end
 	end
-	part(bus, "Bumper", Vector3.new(14, 0.8, 1), CFrame.new(0, 4.5, 70.8), Color3.fromRGB(165, 165, 165), Enum.Material.Metal)
-	part(bus, "StopSign", Vector3.new(0.5, 3, 3), CFrame.new(7.2, 8, 86), Color3.fromRGB(190, 35, 35), Enum.Material.Metal)
+	part(bus, "Bumper", Vector3.new(14, 0.8, 1), CFrame.new(0, 3, 70.8), Color3.fromRGB(165, 165, 165), Enum.Material.Metal)
+	part(bus, "StopSign", Vector3.new(0.5, 3, 3), CFrame.new(7.2, 6.5, 86), Color3.fromRGB(190, 35, 35), Enum.Material.Metal)
 end
 
 local busModel = scene:WaitForChild("SchoolBus")
 local busRoot = busModel.PrimaryPart or busModel:FindFirstChild("BusRoot")
 if busRoot then busModel.PrimaryPart = busRoot end
 local startPivot = busModel:GetPivot()
-local endPivot = CFrame.new(0, 4, -2)
+local endPivot = CFrame.new(0, 2.5, -2)
 
 local function teleportAll()
 	local spawnBase = CFrame.new(0, 3, 14)
@@ -280,8 +281,8 @@ local function startCamera(startAt, duration)
 	camera = workspace.CurrentCamera
 	camera.CameraType = Enum.CameraType.Scriptable
 
-	local startCam = CFrame.lookAt(Vector3.new(28, 15, 70), Vector3.new(0, 8, 48))
-	local endCam = CFrame.lookAt(Vector3.new(23, 11, 10), Vector3.new(0, 7, -2))
+	local startCam = CFrame.lookAt(Vector3.new(30, 17, 112), Vector3.new(0, 7, 82))
+	local endCam = CFrame.lookAt(Vector3.new(27, 13, 24), Vector3.new(0, 6, -12))
 	if renderConnection then renderConnection:Disconnect() end
 	renderConnection = RunService.RenderStepped:Connect(function()
 		local alpha = math.clamp((workspace:GetServerTimeNow() - startAt) / duration, 0, 1)
